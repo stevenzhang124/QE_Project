@@ -112,7 +112,9 @@ def draw_single(frame, pts, joint_format='coco'):
         cor_x, cor_y = int(pts[n, 0]), int(pts[n, 1])
         part_line[n] = (cor_x, cor_y)
         # cv2.circle(frame, (cor_x, cor_y), 3, p_color[n], -1)
-        cv2.circle(frame, (cor_x, cor_y), 1, p_color[n], 1)
+        if n == 5 or n == 6:
+            cv2.circle(frame, (cor_x, cor_y), 3, p_color[n], 1)
+        #cv2.circle(frame, (cor_x, cor_y), 1, p_color[n], 1)
 
     for i, (start_p, end_p) in enumerate(l_pair):
         if start_p in part_line and end_p in part_line:

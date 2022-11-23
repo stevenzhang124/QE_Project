@@ -119,13 +119,17 @@ if __name__ == '__main__':
     fps_time = 0
     f = 0
     while cam.grabbed():
+        #f += 1
+        #frame = cam.getitem()
+        #image = frame.copy()
         f += 1
-        frame = cam.getitem()
-        image = frame.copy()
+        if f % 5 != 0:
+            frame = cam.getitem()
+            continue
 
         # Detect humans bbox in the frame with detector model.
         detected = detect_model.detect(frame, need_resize=False, expand_bb=10)
-        if f == 2:
+        if f == 5:
             print(frame.shape)
 
         # Predict each tracks bbox of current frame from previous frames information with Kalman filter.
@@ -207,7 +211,7 @@ if __name__ == '__main__':
         #frame = cv2.putText(frame, '%d, FPS: %f' % (f, 1.0 / (time.time() - fps_time)),
                             #(10, 20), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 1)
         
-        if f == 2:
+        if f == 5:
             print(frame.shape)
         frame = frame[:, :, ::-1]
         fps_time = time.time()
