@@ -50,7 +50,9 @@ class Detection(object):
 
 
 class Track:
-    def __init__(self, mean, covariance, track_id, n_init, max_age=30, buffer=30):
+    def __init__(self, mean, covariance, role, location, track_id, n_init, max_age=30, buffer=30):
+        self.role = role
+        self.color_location = location
         self.mean = mean
         self.covariance = covariance
         self.track_id = track_id
@@ -64,6 +66,10 @@ class Track:
         self.keypoints_list = deque(maxlen=buffer)
 
         self.state = TrackState.Tentative
+
+    def get_color_location(self):
+
+        return self.color_location
 
     def to_tlwh(self):
         ret = self.mean[:4].copy()
@@ -127,6 +133,23 @@ class Tracker:
         self.tracks = []
         self._next_id = 1
 
+    def judge_role(self, frame, bbox):
+        x = int((bbox[0] + bbox[2])/2)
+        y = int(bbox[1] + (bbox[3] - bbox[1])/3)
+        b, g, r = frame[y,x]
+        
+        b = int(b)
+        g = int(g)
+        r = int(r)
+        print(b, g, r)
+        #frame = cv2.putText(frame, 'color', (x, y), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 0, 0), 2)
+        
+        if b >= 100 and g >=100 and r>=100:
+            return "Doctor", (x, y)
+        else:
+            return "Nurse", (x, y)
+
+
     def predict(self):
         """Propagate track state distributions one time step forward.
         This function should be called once every time step, before `update`.
@@ -134,7 +157,7 @@ class Tracker:
         for track in self.tracks:
             track.predict(self.kf)
 
-    def update(self, detections):
+    def update(self, detections, frame):
         """Perform measurement update and track management.
         Parameters
         ----------
@@ -152,7 +175,7 @@ class Tracker:
             self.tracks[track_idx].mark_missed()
         # Create new detections track.
         for detection_idx in unmatched_detections:
-            self._initiate_track(detections[detection_idx])
+            self._initiate_track(detections[detection_idx],frame)
 
         # Remove deleted tracks.
         self.tracks = [t for t in self.tracks if not t.is_deleted()]
@@ -182,11 +205,20 @@ class Tracker:
         unmatched_tracks = list(set(unmatched_tracks_a + unmatched_tracks_b))
         return matches, unmatched_tracks, unmatched_detections
 
-    def _initiate_track(self, detection):
+    def _initiate_track(self, detection, frame):
         if detection.confidence < 0.4:
             return
         mean, covariance = self.kf.initiate(detection.to_xyah())
-        self.tracks.append(Track(mean, covariance, self._next_id, self.n_init, self.max_age))
+        
+        ret = mean[:4].copy()
+        ret[2] *= ret[3]
+        ret[:2] -= ret[2:] / 2
+        ret[2:] = ret[:2] + ret[2:]
+
+        bbox = ret.astype(int)
+
+        role, location = self.judge_role(frame, bbox)
+        self.tracks.append(Track(mean, covariance, role, location, self._next_id, self.n_init, self.max_age))
         self._next_id += 1
 
 

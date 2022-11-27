@@ -125,6 +125,26 @@ def draw_single(frame, pts, joint_format='coco'):
     return frame
 
 
+def get_hand_location(pts, joint_format='coco'):
+    if joint_format == 'coco':
+        l_pair = COCO_PAIR
+        p_color = POINT_COLORS
+        line_color = LINE_COLORS
+    elif joint_format == 'mpii':
+        l_pair = MPII_PAIR
+        p_color = [PURPLE, BLUE, BLUE, RED, RED, BLUE, BLUE, RED, RED, PURPLE, PURPLE, PURPLE, RED, RED,BLUE,BLUE]
+    else:
+        NotImplementedError
+
+    pts = np.concatenate((pts, np.expand_dims((pts[1, :] + pts[2, :]) / 2, 0)), axis=0)
+    
+    left_hand = int(pts[5, 0]), int(pts[5, 1])
+    right_hand = int(pts[6, 0]), int(pts[6, 1])
+
+    return left_hand, right_hand
+
+
+
 def vis_frame_fast(frame, im_res, joint_format='coco'):
     """
     frame: frame image
