@@ -24,10 +24,10 @@ class TinyYOLOv3_onecls(object):
                  input_size=416,
                  config_file='Models/yolo-tiny-onecls/yolov3-tiny-onecls.cfg',
                  weight_file='Models/yolo-tiny-onecls/best-model.pth',
-                 #nms=0.2, # for single room
-                 nms = 0.3,
-                 #conf_thres=0.8, # for single room
-                 conf_thres=0.95, # for two-beds room
+                 nms=0.2, # for single room
+                 #nms = 0.05,
+                 conf_thres=0.8, # for single room
+                 #conf_thres=0.9, # for two-beds room
                  device='cuda'):
         self.input_size = input_size
         self.model = Darknet(config_file).to(device)

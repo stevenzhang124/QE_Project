@@ -10,7 +10,7 @@ from CameraLoader import CamLoader, CamLoader_Q
 from DetectorLoader import TinyYOLOv3_onecls
 
 from PoseEstimateLoader import SPPE_FastPose
-from fn import draw_single, get_hand_location
+from fn import draw_single, get_hand_location, draw_single_original_image
 
 from Track.Tracker import Detection, Tracker
 #from ActionsEstLoader import TSSTG
@@ -19,8 +19,11 @@ from Track.Tracker import Detection, Tracker
 #source = '../Data/falldata/Home/Videos/video (2).avi'  # hard detect
 source = '../Data/falldata/Home/Videos/video (1).avi'
 #source = 2
-patient_area = (292,264), (367,396)
-basin_area = (73,307), (105,347)  
+patient_area_1 = (253, 211), (433, 250)
+patient_area_2 = (136, 348), (445, 435)
+basin_area_1 = (389, 180), (409, 197)
+basin_area_2 = (194, 211), (213, 226)
+basin_area_3 = (71, 312), (97, 336)
 
 def preproc(image):
     """preprocess function for CameraLoader.
@@ -56,17 +59,38 @@ def box_iou2(a, b):
 
 
 def wash_hand(right_hand, left_hand):
-    if (right_hand[0] > basin_area[0][0] and right_hand[0] < basin_area[1][0] and right_hand[1] > basin_area[0][1] and right_hand[1] < basin_area[1][1]) \
-        and (left_hand[0] > basin_area[0][0] and left_hand[0] < basin_area[1][0] and left_hand[1] > basin_area[0][1] and left_hand[1] < basin_area[1][1]):
+
+    if (right_hand[0] > basin_area_1[0][0] and right_hand[0] < basin_area_1[1][0] and right_hand[1] > basin_area_1[0][1] and right_hand[1] < basin_area_1[1][1]) \
+        and (left_hand[0] > basin_area_1[0][0] and left_hand[0] < basin_area_1[1][0] and left_hand[1] > basin_area_1[0][1] and left_hand[1] < basin_area_1[1][1]):
         return True
-    else:
+
+    elif (right_hand[0] > basin_area_2[0][0] and right_hand[0] < basin_area_2[1][0] and right_hand[1] > basin_area_2[0][1] and right_hand[1] < basin_area_2[1][1]) \
+        and (left_hand[0] > basin_area_2[0][0] and left_hand[0] < basin_area_2[1][0] and left_hand[1] > basin_area_2[0][1] and left_hand[1] < basin_area_2[1][1]):
+
+        return True
+
+    elif (right_hand[0] > basin_area_3[0][0] and right_hand[0] < basin_area_3[1][0] and right_hand[1] > basin_area_3[0][1] and right_hand[1] < basin_area_3[1][1]) \
+        and (left_hand[0] > basin_area_3[0][0] and left_hand[0] < basin_area_3[1][0] and left_hand[1] > basin_area_3[0][1] and left_hand[1] < basin_area_3[1][1]):
+
+        return True
+    
+    else:    
         return False
 
 
 def touch_patient(right_hand, left_hand):
-    if (right_hand[0] > patient_area[0][0] and right_hand[0] < patient_area[1][0] and right_hand[1] > patient_area[0][1] and right_hand[1] < patient_area[1][1]) \
-        and (left_hand[0] > patient_area[0][0] and left_hand[0] < patient_area[1][0] and left_hand[1] > patient_area[0][1] and left_hand[1] < patient_area[1][1]):
+
+    if (right_hand[0] > patient_area_1[0][0] and right_hand[0] < patient_area_1[1][0] and right_hand[1] > patient_area_1[0][1] and right_hand[1] < patient_area_1[1][1]) \
+        and (left_hand[0] > patient_area_1[0][0] and left_hand[0] < patient_area_1[1][0] and left_hand[1] > patient_area_1[0][1] and left_hand[1] < patient_area_1[1][1]):
+        
         return True
+    
+    elif (right_hand[0] > patient_area_2[0][0] and right_hand[0] < patient_area_2[1][0] and right_hand[1] > patient_area_2[0][1] and right_hand[1] < patient_area_2[1][1]) \
+        and (left_hand[0] > patient_area_2[0][0] and left_hand[0] < patient_area_2[1][0] and left_hand[1] > patient_area_2[0][1] and left_hand[1] < patient_area_2[1][1]):
+
+        return True
+
+
     else:
         return False
 
@@ -130,14 +154,14 @@ if __name__ == '__main__':
         # codec = cv2.VideoWriter_fourcc(*'MJPG')
         # writer = cv2.VideoWriter(args.save_out, codec, 30, (inp_dets * 2, inp_dets * 2))
         codec = cv2.VideoWriter_fourcc(*'mp4v')
-        writer = cv2.VideoWriter(args.save_out, codec, 25, (inp_dets, inp_dets))
+        writer = cv2.VideoWriter(args.save_out, codec, 5, (inp_dets, inp_dets))
 
 
     fps_time = 0
     f = 0
     while cam.grabbed():
         f += 1
-        frame = cam.getitem()
+        frame, image = cam.getitem()
         #image = frame.copy()
         #f += 1
         #if f % 5 != 0:
@@ -187,57 +211,79 @@ if __name__ == '__main__':
 
             track_id = track.track_id
             track_role = track.role
-            color_location = track.color_location
+            #color_location = track.color_location
             bbox = track.to_tlbr().astype(int)
             center = track.get_center().astype(int)
             left_hand, right_hand = get_hand_location(track.keypoints_list[-1])
 
+            image_bbox = [bbox[0]*2, (bbox[1]-140)*2, bbox[2]*2, (bbox[3]-140)*2]
+            image_center = [center[0]*2, (center[1]-140)*2]
+
 
             # VISUALIZE.
             if track.time_since_update == 0:
-                if wash_hand(right_hand, left_hand):
-                    frame = cv2.putText(frame, 'washing hand', (bbox[0]+15, bbox[1]+15), cv2.FONT_HERSHEY_COMPLEX, 0.8, (255, 0, 0), 2)   
+                if box_iou2(bbox,patient_area_1) < 0.2:
+                    if wash_hand(right_hand, left_hand):
+                        #frame = cv2.putText(frame, 'washing hand', (bbox[0]+15, bbox[1]+15), cv2.FONT_HERSHEY_COMPLEX, 0.8, (255, 0, 0), 2) 
+                        image = cv2.putText(image, 'washing hand', (image_bbox[0]+15, image_bbox[1]+15), cv2.FONT_HERSHEY_COMPLEX, 0.8, (255, 0, 0), 2)   
 
-                if touch_patient(right_hand, left_hand):
-                    frame = cv2.putText(frame, 'touching patient', (bbox[0]+15, bbox[1]+15), cv2.FONT_HERSHEY_COMPLEX, 0.8, (255, 0, 0), 2)               
+                    if touch_patient(right_hand, left_hand):
+                        #frame = cv2.putText(frame, 'touching patient', (bbox[0]+15, bbox[1]+15), cv2.FONT_HERSHEY_COMPLEX, 0.8, (255, 0, 0), 2) 
+                        image = cv2.putText(image, 'touching patient', (image_bbox[0]+15, image_bbox[1]+15), cv2.FONT_HERSHEY_COMPLEX, 0.8, (255, 0, 0), 2)               
 
-                #if track_id == 1:
-                    #frame = cv2.putText(frame, str(center[0]) + ' ' + str(center[1]), (center[0], center[1]), cv2.FONT_HERSHEY_SIMPLEX,
-                                        #0.7, (255, 0, 0), 2)  
-                    #frame = cv2.putText(frame, 'Doctor', (center[0], center[1]), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 0, 0), 2)
-                    #frame = cv2.putText(frame, 'Nurse', (center[0], center[1]), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 0, 0), 2)  
+                    #if track_id == 1:
+                        #frame = cv2.putText(frame, str(center[0]) + ' ' + str(center[1]), (center[0], center[1]), cv2.FONT_HERSHEY_SIMPLEX,
+                                            #0.7, (255, 0, 0), 2)  
+                        #frame = cv2.putText(frame, 'Doctor', (center[0], center[1]), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 0, 0), 2)
+                        #frame = cv2.putText(frame, 'Nurse', (center[0], center[1]), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 0, 0), 2)  
 
-                if args.show_skeleton:
-                    frame = draw_single(frame, track.keypoints_list[-1])
-                
-                frame = cv2.rectangle(frame, (bbox[0], bbox[1]), (bbox[2], bbox[3]), (0, 255, 0), 1)
-                frame = cv2.putText(frame, str(track_id), (center[0], center[1]), cv2.FONT_HERSHEY_COMPLEX, 0.7, (255, 0, 0), 2)
-                frame = cv2.putText(frame, track_role, (center[0]+20, center[1]+20), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 0, 0), 2)
-                frame = cv2.putText(frame, 'color', color_location, cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 0, 0), 2)
- 
+                    if args.show_skeleton:
+                        #frame = draw_single(frame, track.keypoints_list[-1])
+                        image = draw_single_original_image(image, track.keypoints_list[-1])
+                    
+                    #frame = cv2.rectangle(frame, (bbox[0], bbox[1]), (bbox[2], bbox[3]), (0, 255, 0), 1)
+                    #frame = cv2.putText(frame, str(track_id), (center[0], center[1]), cv2.FONT_HERSHEY_COMPLEX, 0.7, (255, 0, 0), 2)
+                    #frame = cv2.putText(frame, track_role, (center[0]+20, center[1]+20), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 0, 0), 2)
+                    #frame = cv2.putText(frame, 'color', color_location, cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 0, 0), 2)
+
+                    image = cv2.rectangle(image, (image_bbox[0], image_bbox[1]), (image_bbox[2], image_bbox[3]), (0, 255, 0), 1)
+                    image = cv2.putText(image, str(track_id), (image_center[0], image_center[1]), cv2.FONT_HERSHEY_COMPLEX, 0.7, (255, 0, 0), 2)
+                    image = cv2.putText(image, track_role, (image_center[0]+20, image_center[1]+20), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 0, 0), 2)
+     
         # Show Frame.
         # frame = cv2.resize(frame, (0, 0), fx=2., fy=2.)
         # draw patient area yellow
-        frame = cv2.rectangle(frame, patient_area[0], patient_area[1], (0,255,255), 2)
+        image_patient_area_1 = (patient_area_1[0][0]*2, (patient_area_1[0][1]-140)*2),(patient_area_1[1][0]*2, (patient_area_1[1][1]-140)*2)
+        image_patient_area_2 = (patient_area_2[0][0]*2, (patient_area_2[0][1]-140)*2),(patient_area_2[1][0]*2, (patient_area_2[1][1]-140)*2)
+
+        image_basin_area_1 = (basin_area_1[0][0]*2, (basin_area_1[0][1]-140)*2),(basin_area_1[1][0]*2, (basin_area_1[1][1]-140)*2)
+        image_basin_area_2 = (basin_area_2[0][0]*2, (basin_area_2[0][1]-140)*2),(basin_area_2[1][0]*2, (basin_area_2[1][1]-140)*2)
+        image_basin_area_3 = (basin_area_3[0][0]*2, (basin_area_3[0][1]-140)*2),(basin_area_3[1][0]*2, (basin_area_3[1][1]-140)*2)
+
+        image = cv2.rectangle(image, image_patient_area_1[0], image_patient_area_1[1], (0,255,255), 2)
+        image = cv2.rectangle(image, image_patient_area_2[0], image_patient_area_2[1], (0,255,255), 2)
         # draw basin area orange
-        frame = cv2.rectangle(frame, basin_area[0], basin_area[1], (0,165,255), 2)
+        image = cv2.rectangle(image, image_basin_area_1[0], image_basin_area_1[1], (0,165,255), 2)
+        image = cv2.rectangle(image, image_basin_area_2[0], image_basin_area_2[1], (0,165,255), 2)
+        image = cv2.rectangle(image, image_basin_area_3[0], image_basin_area_3[1], (0,165,255), 2)
 
 
         #frame = cv2.putText(frame, '%d, FPS: %f' % (f, 1.0 / (time.time() - fps_time)),
                             #(10, 20), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 1)
         
         
-        frame = frame[:, :, ::-1]
+        image = image[:, :, ::-1]
         #fps_time = time.time()
         #if f == 150 or f == 200 or f == 250:
         #if cv2.waitKey(1) & 0xFF == ord('s'):
+        #if f == 5:
             #print(frame.shape)
             #cv2.imwrite(str(f) + '.jpg', frame)
 
         if outvid:
-            writer.write(frame)
+            writer.write(image)
 
-        cv2.imshow('frame', frame)
+        cv2.imshow('frame', image)
         if cv2.waitKey(1) & 0xFF == ord('q'):
             break
 

@@ -125,6 +125,41 @@ def draw_single(frame, pts, joint_format='coco'):
     return frame
 
 
+def draw_single_original_image(frame, pts, joint_format='coco'):
+    if joint_format == 'coco':
+        l_pair = COCO_PAIR
+        p_color = POINT_COLORS
+        line_color = LINE_COLORS
+    elif joint_format == 'mpii':
+        l_pair = MPII_PAIR
+        p_color = [PURPLE, BLUE, BLUE, RED, RED, BLUE, BLUE, RED, RED, PURPLE, PURPLE, PURPLE, RED, RED,BLUE,BLUE]
+    else:
+        NotImplementedError
+
+    part_line = {}
+    pts = np.concatenate((pts, np.expand_dims((pts[1, :] + pts[2, :]) / 2, 0)), axis=0)
+    for n in range(pts.shape[0]):
+        if pts[n, 2] <= 0.05:
+            continue
+        cor_x, cor_y = int(pts[n, 0]), int(pts[n, 1])
+        cor_x = cor_x*2
+        cor_y = (cor_y-140)*2
+        part_line[n] = (cor_x, cor_y)
+        # cv2.circle(frame, (cor_x, cor_y), 3, p_color[n], -1)
+        if n == 5 or n == 6:
+            cv2.circle(frame, (cor_x, cor_y), 3, p_color[n], 1)
+        #cv2.circle(frame, (cor_x, cor_y), 1, p_color[n], 1)
+
+    for i, (start_p, end_p) in enumerate(l_pair):
+        if start_p in part_line and end_p in part_line:
+            start_xy = part_line[start_p]
+            end_xy = part_line[end_p]
+            # cv2.line(frame, start_xy, end_xy, line_color[i], int(1*(pts[start_p, 2] + pts[end_p, 2]) + 1))
+            cv2.line(frame, start_xy, end_xy, line_color[i],  1)
+    return frame
+
+
+
 def get_hand_location(pts, joint_format='coco'):
     if joint_format == 'coco':
         l_pair = COCO_PAIR

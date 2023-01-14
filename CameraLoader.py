@@ -108,6 +108,7 @@ class CamLoader_Q:
         self.stopped = False
         self.batch_size = batch_size
         self.Q = Queue(maxsize=queue_size)
+        self.Q_original = Queue(maxsize=queue_size)
 
         self.preprocess_fn = preprocess
 
@@ -126,21 +127,28 @@ class CamLoader_Q:
         while not self.stopped:
             if not self.Q.full():
                 frames = []
+                images = []
                 for k in range(self.batch_size):
                     ret, frame = self.stream.read()
                     if not ret:
                         self.stop()
                         return
-
+                    image = frame.copy()
                     if self.preprocess_fn is not None:
                         frame = self.preprocess_fn(frame)
+                        image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
 
                     frames.append(frame)
+                    images.append(image)
                     frames = np.stack(frames)
+                    images = np.stack(images)
                     self.Q.put(frames)
+                    self.Q_original.put(images)
             else:
                 with self.Q.mutex:
                     self.Q.queue.clear()
+                with self.Q_original.mutex:
+                    self.Q_original.queue.clear()
             # time.sleep(0.05)
 
     def grabbed(self):
@@ -148,7 +156,7 @@ class CamLoader_Q:
         return self.Q.qsize() > 0
 
     def getitem(self):
-        return self.Q.get().squeeze()
+        return self.Q.get().squeeze(), self.Q_original.get().squeeze()
 
     def stop(self):
         if self.stopped:
