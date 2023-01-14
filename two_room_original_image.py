@@ -143,7 +143,7 @@ if __name__ == '__main__':
     else:
         # Use normal thread loader for webcam.
         cam = CamLoader(int(cam_source) if cam_source.isdigit() else cam_source,
-                        preprocess=preproc).start()
+                        preprocess=preproc, ori_return=True).start()
 
     #frame_size = cam.frame_size
     #scf = torch.min(inp_size / torch.FloatTensor([frame_size]), 1)[0]
