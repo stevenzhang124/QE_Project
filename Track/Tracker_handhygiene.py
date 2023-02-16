@@ -50,7 +50,9 @@ class Detection(object):
 
 
 class Track:
-    def __init__(self, mean, covariance, role, location, track_id, n_init, max_age=30, buffer=30):
+    def __init__(self, mean, covariance, role, location, hand_clean, touched_patient, track_id, n_init, max_age=30, buffer=30):
+        self.hand_clean = hand_clean
+        self.touched_patient = touched_patient
         self.role = role
         self.color_location = location
         self.mean = mean
@@ -218,7 +220,9 @@ class Tracker:
         bbox = ret.astype(int)
 
         role, location = self.judge_role(frame, bbox)
-        self.tracks.append(Track(mean, covariance, role, location, self._next_id, self.n_init, self.max_age))
+        hand_clean = 0
+        touched_patient = 0
+        self.tracks.append(Track(mean, covariance, role, location, hand_clean, touched_patient, self._next_id, self.n_init, self.max_age))
         self._next_id += 1
 
 

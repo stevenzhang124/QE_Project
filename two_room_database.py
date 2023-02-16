@@ -15,22 +15,26 @@ from fn import draw_single, get_hand_location, draw_single_original_image
 from Track.Tracker_handhygiene import Detection, Tracker
 #from ActionsEstLoader import TSSTG
 
+from flask import Flask, render_template, Response
+import mysql.connector
+
 #source = '../Data/test_video/test7.mp4'
 #source = '../Data/falldata/Home/Videos/video (2).avi'  # hard detect
 source = '../Data/falldata/Home/Videos/video (1).avi'
 #source = 2
-patient_area_1 = (253, 211), (433, 250)
-patient_area_2 = (136, 348), (445, 435)
-basin_area_1 = (389, 180), (409, 197)
-basin_area_2 = (194, 211), (213, 226)
-basin_area_3 = (71, 312), (97, 336)
+patient_area_1 = (253, 206), (433, 245)
+patient_area_2 = (136, 261), (445, 348)
+basin_area_1 = (399, 180), (419, 197)
+basin_area_2 = (214, 226), (233, 241)
+basin_area_3 = (123, 336), (149, 360)
 
+app = Flask(__name__)
 
 def db_connection():
     try:
         mydb = mysql.connector.connect(
-            host="192.168.1.103",
-            user="root",
+            host="192.168.1.113",
+            user="QE_manager",
             port="3306",
             database="QE",
             passwd="edgeimcl",
@@ -49,6 +53,8 @@ def db_connection():
 def preproc(image):
     """preprocess function for CameraLoader.
     """
+    inp_dets = args.detection_input_size
+    resize_fn = ResizePadding(inp_dets, inp_dets)
     image = resize_fn(image)
     image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
     return image
@@ -115,28 +121,7 @@ def touch_patient(right_hand, left_hand):
     else:
         return False
 
-
-
-if __name__ == '__main__':
-    par = argparse.ArgumentParser(description='Human Fall Detection Demo.')
-    par.add_argument('-C', '--camera', default=source,  # required=True,  # default=2,
-                        help='Source of camera or video file path.')
-    par.add_argument('--detection_input_size', type=int, default=384,
-                        help='Size of input in detection model in square must be divisible by 32 (int).')
-    par.add_argument('--pose_input_size', type=str, default='224x160',
-                        help='Size of input in pose model must be divisible by 32 (h, w)')
-    par.add_argument('--pose_backbone', type=str, default='resnet50',
-                        help='Backbone model for SPPE FastPose model.')
-    par.add_argument('--show_detected', default=False, action='store_true',
-                        help='Show all bounding box from detection.')
-    par.add_argument('--show_skeleton', default=True, action='store_true',
-                        help='Show skeleton pose.')
-    par.add_argument('--save_out', type=str, default='',
-                        help='Save display to video file.')
-    par.add_argument('--device', type=str, default='cuda',
-                        help='Device to run model on cpu or cuda.')
-    args = par.parse_args()
-
+def app_main():
     device = args.device
 
     # DETECTION MODEL.
@@ -154,8 +139,6 @@ if __name__ == '__main__':
 
     # Actions Estimate.
     # action_model = TSSTG()
-
-    resize_fn = ResizePadding(inp_dets, inp_dets)
 
     cam_source = args.camera
     if type(cam_source) is str and os.path.isfile(cam_source):
@@ -250,19 +233,21 @@ if __name__ == '__main__':
                     if wash_hand(right_hand, left_hand):
                         #frame = cv2.putText(frame, 'washing hand', (bbox[0]+15, bbox[1]+15), cv2.FONT_HERSHEY_COMPLEX, 0.8, (255, 0, 0), 2) 
                         track.hand_clean = 1
+                        track.touched_patient = 0
                         image = cv2.putText(image, 'washing hand', (image_bbox[0]+15, image_bbox[1]+15), cv2.FONT_HERSHEY_COMPLEX, 0.8, (255, 0, 0), 2)   
 
                     if touch_patient(right_hand, left_hand):
                         #frame = cv2.putText(frame, 'touching patient', (bbox[0]+15, bbox[1]+15), cv2.FONT_HERSHEY_COMPLEX, 0.8, (255, 0, 0), 2) 
-                        if track.hand_clean == 0:
+                        if track.hand_clean == 0 and track.touched_patient == 0:
                             case = 1
-                            info = "insert into handhygiene (time, person, case) values ('{}', '{}', {})".format(int(time.time()), track_role, case)
+                            info = "insert into handhygiene (time, person, incompliance) values ({}, '{}', {})".format('NOW()', track_role, int(case))
                             cursor.execute(info)
-                        else:
+                        if track.hand_clean == 1 and track.touched_patient == 0:
                             case = 0
-                            info = "insert into handhygiene (time, person, case) values ('{}', '{}', {})".format(int(time.time()), track_role, case)
+                            info = "insert into handhygiene (time, person, incompliance) values ({}, '{}', {})".format('NOW()', track_role, int(case))
                             cursor.execute(info)
                         track.hand_clean = 0
+                        track.touched_patient = 1
                         image = cv2.putText(image, 'touching patient', (image_bbox[0]+15, image_bbox[1]+15), cv2.FONT_HERSHEY_COMPLEX, 0.8, (255, 0, 0), 2)               
 
                     #if track_id == 1:
@@ -317,12 +302,49 @@ if __name__ == '__main__':
         if outvid:
             writer.write(image)
 
-        cv2.imshow('frame', image)
-        if cv2.waitKey(1) & 0xFF == ord('q'):
-            break
+        #cv2.imshow('frame', image)
+        #if cv2.waitKey(1) & 0xFF == ord('q'):
+            #break
+
+        (flag, outputFrame) = cv2.imencode(".jpg", image)
+        yield (b'--frame\r\n'
+                    b'Content-Type: image/jpeg\r\n\r\n' + bytearray(outputFrame) + b'\r\n')
 
     # Clear resource.
     cam.stop()
     if outvid:
         writer.release()
     cv2.destroyAllWindows()
+
+
+
+
+@app.route('/video_feed')
+def video_feed():
+    #Video streaming route. Put this in the src attribute of an img tag
+    return Response(app_main(), mimetype='multipart/x-mixed-replace; boundary=frame')
+
+if __name__ == '__main__':
+    par = argparse.ArgumentParser(description='Human Fall Detection Demo.')
+    par.add_argument('-C', '--camera', default=source,  # required=True,  # default=2,
+                        help='Source of camera or video file path.')
+    par.add_argument('--detection_input_size', type=int, default=384,
+                        help='Size of input in detection model in square must be divisible by 32 (int).')
+    par.add_argument('--pose_input_size', type=str, default='224x160',
+                        help='Size of input in pose model must be divisible by 32 (h, w)')
+    par.add_argument('--pose_backbone', type=str, default='resnet50',
+                        help='Backbone model for SPPE FastPose model.')
+    par.add_argument('--show_detected', default=False, action='store_true',
+                        help='Show all bounding box from detection.')
+    par.add_argument('--show_skeleton', default=True, action='store_true',
+                        help='Show skeleton pose.')
+    par.add_argument('--save_out', type=str, default='',
+                        help='Save display to video file.')
+    par.add_argument('--device', type=str, default='cuda',
+                        help='Device to run model on cpu or cuda.')
+    args = par.parse_args()
+
+    app.run(host='0.0.0.0', port='5000')
+
+
+    

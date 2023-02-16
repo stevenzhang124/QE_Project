@@ -3,7 +3,7 @@ import mysql.connector
 def db_connection():
     try:
         mydb = mysql.connector.connect(
-            host="localhost",
+            host="192.168.1.113",
             user="QE_manager",
             port="3306",
             database="QE",
@@ -27,5 +27,9 @@ action = 'leaving bed'
 info = "insert into leavebed (time, bed, status) values ({}, {}, '{}')".format('NOW()', '1', action)
 cursor.execute(info)
 info = "insert into leavebed (time, bed, status) values ({}, {}, '{}')".format('NOW()', '2', 'on bed')
+cursor.execute(info)
+
+case = 0
+info = "insert into handhygiene (time, person, incompliance) values ({}, '{}', {})".format('NOW()', 'doctor', case)
 cursor.execute(info)
 
