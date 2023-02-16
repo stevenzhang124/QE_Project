@@ -12,17 +12,18 @@ from DetectorLoader import TinyYOLOv3_onecls
 from PoseEstimateLoader import SPPE_FastPose
 from fn import draw_single, get_hand_location, draw_single_original_image
 
-from Track.Tracker import Detection, Tracker
+from Track.Tracker_handhygiene import Detection, Tracker
 #from ActionsEstLoader import TSSTG
-
-import mysql.connector
 
 #source = '../Data/test_video/test7.mp4'
 #source = '../Data/falldata/Home/Videos/video (2).avi'  # hard detect
 source = '../Data/falldata/Home/Videos/video (1).avi'
 #source = 2
-patient_area_1 = (253, 206), (433, 245)
+patient_area_1 = (253, 211), (433, 250)
 patient_area_2 = (136, 348), (445, 435)
+basin_area_1 = (389, 180), (409, 197)
+basin_area_2 = (194, 211), (213, 226)
+basin_area_3 = (71, 312), (97, 336)
 
 
 def db_connection():
@@ -76,6 +77,43 @@ def box_iou2(a, b):
     s_b = (b[1][0] - b[0][0])*(b[1][1] - b[0][1])
   
     return float(s_intsec)/(s_a + s_b -s_intsec)
+
+
+def wash_hand(right_hand, left_hand):
+
+    if (right_hand[0] > basin_area_1[0][0] and right_hand[0] < basin_area_1[1][0] and right_hand[1] > basin_area_1[0][1] and right_hand[1] < basin_area_1[1][1]) \
+        and (left_hand[0] > basin_area_1[0][0] and left_hand[0] < basin_area_1[1][0] and left_hand[1] > basin_area_1[0][1] and left_hand[1] < basin_area_1[1][1]):
+        return True
+
+    elif (right_hand[0] > basin_area_2[0][0] and right_hand[0] < basin_area_2[1][0] and right_hand[1] > basin_area_2[0][1] and right_hand[1] < basin_area_2[1][1]) \
+        and (left_hand[0] > basin_area_2[0][0] and left_hand[0] < basin_area_2[1][0] and left_hand[1] > basin_area_2[0][1] and left_hand[1] < basin_area_2[1][1]):
+
+        return True
+
+    elif (right_hand[0] > basin_area_3[0][0] and right_hand[0] < basin_area_3[1][0] and right_hand[1] > basin_area_3[0][1] and right_hand[1] < basin_area_3[1][1]) \
+        and (left_hand[0] > basin_area_3[0][0] and left_hand[0] < basin_area_3[1][0] and left_hand[1] > basin_area_3[0][1] and left_hand[1] < basin_area_3[1][1]):
+
+        return True
+    
+    else:    
+        return False
+
+
+def touch_patient(right_hand, left_hand):
+
+    if (right_hand[0] > patient_area_1[0][0] and right_hand[0] < patient_area_1[1][0] and right_hand[1] > patient_area_1[0][1] and right_hand[1] < patient_area_1[1][1]) \
+        and (left_hand[0] > patient_area_1[0][0] and left_hand[0] < patient_area_1[1][0] and left_hand[1] > patient_area_1[0][1] and left_hand[1] < patient_area_1[1][1]):
+        
+        return True
+    
+    elif (right_hand[0] > patient_area_2[0][0] and right_hand[0] < patient_area_2[1][0] and right_hand[1] > patient_area_2[0][1] and right_hand[1] < patient_area_2[1][1]) \
+        and (left_hand[0] > patient_area_2[0][0] and left_hand[0] < patient_area_2[1][0] and left_hand[1] > patient_area_2[0][1] and left_hand[1] < patient_area_2[1][1]):
+
+        return True
+
+
+    else:
+        return False
 
 
 
@@ -144,7 +182,6 @@ if __name__ == '__main__':
     f = 0
     mydb = db_connection()
     cursor = mydb.cursor()
-    id_inserted = []
 
     while cam.grabbed():
         f += 1
@@ -157,8 +194,8 @@ if __name__ == '__main__':
 
         # Detect humans bbox in the frame with detector model.
         detected = detect_model.detect(frame, need_resize=False, expand_bb=10)
-        #if f == 5:
-            #print(frame.shape)
+        if f == 5:
+            print(frame.shape)
 
         # Predict each tracks bbox of current frame from previous frames information with Kalman filter.
         tracker.predict()
@@ -197,71 +234,55 @@ if __name__ == '__main__':
                 continue
 
             track_id = track.track_id
-            # track_role = track.role
+            track_role = track.role
+            #color_location = track.color_location
             bbox = track.to_tlbr().astype(int)
             center = track.get_center().astype(int)
+            left_hand, right_hand = get_hand_location(track.keypoints_list[-1])
 
             image_bbox = [bbox[0]*2, (bbox[1]-140)*2, bbox[2]*2, (bbox[3]-140)*2]
             image_center = [center[0]*2, (center[1]-140)*2]
 
 
-            #action = 'pending..'
-            #clr = (0, 255, 0)
-            # Use 30 frames time-steps to prediction.
-            #if len(track.keypoints_list) == 30:
-                #pts = np.array(track.keypoints_list, dtype=np.float32)
-                #out = action_model.predict(pts, frame.shape[:2])
-                #action_name = action_model.class_names[out[0].argmax()]
-                #action = '{}: {:.2f}%'.format(action_name, out[0].max() * 100)
-                #if action_name == 'Fall Down':
-                    #clr = (255, 0, 0)
-                #elif action_name == 'Lying Down':
-                    #clr = (255, 200, 0)
-
-
             # VISUALIZE.
             if track.time_since_update == 0:
+                if box_iou2(bbox,patient_area_1) < 0.2:
+                    if wash_hand(right_hand, left_hand):
+                        #frame = cv2.putText(frame, 'washing hand', (bbox[0]+15, bbox[1]+15), cv2.FONT_HERSHEY_COMPLEX, 0.8, (255, 0, 0), 2) 
+                        track.hand_clean = 1
+                        image = cv2.putText(image, 'washing hand', (image_bbox[0]+15, image_bbox[1]+15), cv2.FONT_HERSHEY_COMPLEX, 0.8, (255, 0, 0), 2)   
+
+                    if touch_patient(right_hand, left_hand):
+                        #frame = cv2.putText(frame, 'touching patient', (bbox[0]+15, bbox[1]+15), cv2.FONT_HERSHEY_COMPLEX, 0.8, (255, 0, 0), 2) 
+                        if track.hand_clean == 0:
+                            case = 1
+                            info = "insert into handhygiene (time, person, case) values ('{}', '{}', {})".format(int(time.time()), track_role, case)
+                            cursor.execute(info)
+                        else:
+                            case = 0
+                            info = "insert into handhygiene (time, person, case) values ('{}', '{}', {})".format(int(time.time()), track_role, case)
+                            cursor.execute(info)
+                        track.hand_clean = 0
+                        image = cv2.putText(image, 'touching patient', (image_bbox[0]+15, image_bbox[1]+15), cv2.FONT_HERSHEY_COMPLEX, 0.8, (255, 0, 0), 2)               
+
+                    #if track_id == 1:
+                        #frame = cv2.putText(frame, str(center[0]) + ' ' + str(center[1]), (center[0], center[1]), cv2.FONT_HERSHEY_SIMPLEX,
+                                            #0.7, (255, 0, 0), 2)  
+                        #frame = cv2.putText(frame, 'Doctor', (center[0], center[1]), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 0, 0), 2)
+                        #frame = cv2.putText(frame, 'Nurse', (center[0], center[1]), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 0, 0), 2)  
+
                     if args.show_skeleton:
+                        #frame = draw_single(frame, track.keypoints_list[-1])
                         image = draw_single_original_image(image, track.keypoints_list[-1])
-
-                    if center[1] < 320:
-                        # in bed-1 area
-                        if box_iou2(bbox,patient_area_1) < 0.3:
-                            action = 'leaving bed'
-                            clr = (255, 0, 0)
-                            # insert data to database
-                            if track_id not in id_inserted:
-                                info = "insert into leavebed (time, bed, status) values ({}, {}, '{}')".format('NOW()', '1', action)
-                                cursor.execute(info)
-                                id_inserted.append(track_id)
-                        else:
-                            action = 'on bed'
-                            clr = (255, 200, 0)
-                            #insert data to database
-                            info = "insert into leavebed (time, bed, status) values ({}, {}, '{}')".format('NOW()' '1', action)
-                            cursor.execute(info)
-                    else:
-                        # in bed-2 area
-                        if box_iou2(bbox,patient_area_2) < 0.3:
-                            action = 'leaving bed'
-                            clr = (255, 0, 0)
-                            # insert data to database
-                            if track_id not in id_inserted:
-                                info = "insert into leavebed (time, bed, status) values ({}, {}, '{}')".format('NOW()', '2', action)
-                                cursor.execute(info)
-                                id_inserted.append(track_id)
-                        else:
-                            action = 'on bed'
-                            clr = (255, 200, 0)
-                            #insert data to database
-                            info = "insert into leavebed (time, bed, status) values ({}, {}, '{}')".format('NOW()', '2', action)
-                            cursor.execute(info)
-
+                    
+                    #frame = cv2.rectangle(frame, (bbox[0], bbox[1]), (bbox[2], bbox[3]), (0, 255, 0), 1)
+                    #frame = cv2.putText(frame, str(track_id), (center[0], center[1]), cv2.FONT_HERSHEY_COMPLEX, 0.7, (255, 0, 0), 2)
+                    #frame = cv2.putText(frame, track_role, (center[0]+20, center[1]+20), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 0, 0), 2)
+                    #frame = cv2.putText(frame, 'color', color_location, cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 0, 0), 2)
 
                     image = cv2.rectangle(image, (image_bbox[0], image_bbox[1]), (image_bbox[2], image_bbox[3]), (0, 255, 0), 1)
                     image = cv2.putText(image, str(track_id), (image_center[0], image_center[1]), cv2.FONT_HERSHEY_COMPLEX, 0.7, (255, 0, 0), 2)
-                    image = cv2.putText(image, action, (image_bbox[0] + 5, image_bbox[1] + 15), cv2.FONT_HERSHEY_COMPLEX, 0.7, clr, 2)
-                    # image = cv2.putText(image, track_role, (image_center[0]+20, image_center[1]+20), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 0, 0), 2)
+                    image = cv2.putText(image, track_role, (image_center[0]+20, image_center[1]+20), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 0, 0), 2)
      
         # Show Frame.
         # frame = cv2.resize(frame, (0, 0), fx=2., fy=2.)
@@ -269,8 +290,16 @@ if __name__ == '__main__':
         image_patient_area_1 = (patient_area_1[0][0]*2, (patient_area_1[0][1]-140)*2),(patient_area_1[1][0]*2, (patient_area_1[1][1]-140)*2)
         image_patient_area_2 = (patient_area_2[0][0]*2, (patient_area_2[0][1]-140)*2),(patient_area_2[1][0]*2, (patient_area_2[1][1]-140)*2)
 
+        image_basin_area_1 = (basin_area_1[0][0]*2, (basin_area_1[0][1]-140)*2),(basin_area_1[1][0]*2, (basin_area_1[1][1]-140)*2)
+        image_basin_area_2 = (basin_area_2[0][0]*2, (basin_area_2[0][1]-140)*2),(basin_area_2[1][0]*2, (basin_area_2[1][1]-140)*2)
+        image_basin_area_3 = (basin_area_3[0][0]*2, (basin_area_3[0][1]-140)*2),(basin_area_3[1][0]*2, (basin_area_3[1][1]-140)*2)
+
         image = cv2.rectangle(image, image_patient_area_1[0], image_patient_area_1[1], (0,255,255), 2)
         image = cv2.rectangle(image, image_patient_area_2[0], image_patient_area_2[1], (0,255,255), 2)
+        # draw basin area orange
+        image = cv2.rectangle(image, image_basin_area_1[0], image_basin_area_1[1], (0,165,255), 2)
+        image = cv2.rectangle(image, image_basin_area_2[0], image_basin_area_2[1], (0,165,255), 2)
+        image = cv2.rectangle(image, image_basin_area_3[0], image_basin_area_3[1], (0,165,255), 2)
 
 
         #frame = cv2.putText(frame, '%d, FPS: %f' % (f, 1.0 / (time.time() - fps_time)),
