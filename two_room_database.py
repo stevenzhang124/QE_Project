@@ -110,12 +110,12 @@ def touch_patient(right_hand, left_hand):
     if (right_hand[0] > patient_area_1[0][0] and right_hand[0] < patient_area_1[1][0] and right_hand[1] > patient_area_1[0][1] and right_hand[1] < patient_area_1[1][1]) \
         and (left_hand[0] > patient_area_1[0][0] and left_hand[0] < patient_area_1[1][0] and left_hand[1] > patient_area_1[0][1] and left_hand[1] < patient_area_1[1][1]):
         
-        return True
+        return 1
     
     elif (right_hand[0] > patient_area_2[0][0] and right_hand[0] < patient_area_2[1][0] and right_hand[1] > patient_area_2[0][1] and right_hand[1] < patient_area_2[1][1]) \
         and (left_hand[0] > patient_area_2[0][0] and left_hand[0] < patient_area_2[1][0] and left_hand[1] > patient_area_2[0][1] and left_hand[1] < patient_area_2[1][1]):
 
-        return True
+        return 2
 
 
     else:
@@ -171,9 +171,9 @@ def app_main():
         frame, image = cam.getitem()
         #image = frame.copy()
         #f += 1
-        #if f % 5 != 0:
-            #frame = cam.getitem()
-            #continue
+        if f % 5 != 0:
+            frame, image = cam.getitem()
+            continue
 
         # Detect humans bbox in the frame with detector model.
         detected = detect_model.detect(frame, need_resize=False, expand_bb=10)
@@ -233,23 +233,39 @@ def app_main():
                     if wash_hand(right_hand, left_hand):
                         #frame = cv2.putText(frame, 'washing hand', (bbox[0]+15, bbox[1]+15), cv2.FONT_HERSHEY_COMPLEX, 0.8, (255, 0, 0), 2) 
                         track.hand_clean = 1
-                        track.touched_patient = 0
+                        track.touched_patient_1 = 0
+                        track.touched_patient_2 = 0
                         image = cv2.putText(image, 'washing hand', (image_bbox[0]+15, image_bbox[1]+15), cv2.FONT_HERSHEY_COMPLEX, 0.8, (255, 0, 0), 2)   
 
-                    if touch_patient(right_hand, left_hand):
+                    if touch_patient(right_hand, left_hand) == 1:
                         #frame = cv2.putText(frame, 'touching patient', (bbox[0]+15, bbox[1]+15), cv2.FONT_HERSHEY_COMPLEX, 0.8, (255, 0, 0), 2) 
-                        if track.hand_clean == 0 and track.touched_patient == 0:
+                        if track.hand_clean == 0 and track.touched_patient_1 == 0:
                             case = 1
                             info = "insert into handhygiene (time, person, incompliance) values ({}, '{}', {})".format('NOW()', track_role, int(case))
                             cursor.execute(info)
-                        if track.hand_clean == 1 and track.touched_patient == 0:
+                        if track.hand_clean == 1 and track.touched_patient_1 == 0:
                             case = 0
                             info = "insert into handhygiene (time, person, incompliance) values ({}, '{}', {})".format('NOW()', track_role, int(case))
                             cursor.execute(info)
                         track.hand_clean = 0
-                        track.touched_patient = 1
+                        track.touched_patient_1 = 1
+                        track.touched_patient_2 = 0
                         image = cv2.putText(image, 'touching patient', (image_bbox[0]+15, image_bbox[1]+15), cv2.FONT_HERSHEY_COMPLEX, 0.8, (255, 0, 0), 2)               
 
+                    if touch_patient(right_hand, left_hand) == 2:
+                        #frame = cv2.putText(frame, 'touching patient', (bbox[0]+15, bbox[1]+15), cv2.FONT_HERSHEY_COMPLEX, 0.8, (255, 0, 0), 2) 
+                        if track.hand_clean == 0 and track.touched_patient_2 == 0:
+                            case = 1
+                            info = "insert into handhygiene (time, person, incompliance) values ({}, '{}', {})".format('NOW()', track_role, int(case))
+                            cursor.execute(info)
+                        if track.hand_clean == 1 and track.touched_patient_2 == 0:
+                            case = 0
+                            info = "insert into handhygiene (time, person, incompliance) values ({}, '{}', {})".format('NOW()', track_role, int(case))
+                            cursor.execute(info)
+                        track.hand_clean = 0
+                        track.touched_patient_2 = 1
+                        track.touched_patient_1 = 0
+                        image = cv2.putText(image, 'touching patient', (image_bbox[0]+15, image_bbox[1]+15), cv2.FONT_HERSHEY_COMPLEX, 0.8, (255, 0, 0), 2)
                     #if track_id == 1:
                         #frame = cv2.putText(frame, str(center[0]) + ' ' + str(center[1]), (center[0], center[1]), cv2.FONT_HERSHEY_SIMPLEX,
                                             #0.7, (255, 0, 0), 2)  

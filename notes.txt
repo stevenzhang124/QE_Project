@@ -1,0 +1,44 @@
+ls /dev/ttyACM*
+sudo chmod 666 /dev/ttyACM0
+sudo chmod 666 /dev/ttyACM1
+
+
+cd Desktop/test_ws
+
+roslaunch ti_mmwave_rospkg 1843es1_long_range.launch
+
+
+
+how to judge the human behavior
+
+1. location of the person
+2. key points of the body
+
+center point
+overlap of the bounding box
+
+
+
+color of the doctor and nurse
+
+
+how to show the bounding box on the original picture
+
+
+
+two_nurse_3  show the occulude case, person disappear 
+
+
+next is about the color detection
+
+how to run the QE_project
+python3 QE_main_single_room.py -C ./QE_video_1124/single_bed_room/one_nurse_one_doctor/One_Nurse_One_Doctor_1.mp4  --detection_input_size 640 --save_out single_room_1.mp4
+python3 QE_main_two_rooms.py -C ./QE_video_1124/two_beds_room/Two_beds_Nurse_Doctor_2.mp4  --detection_input_size 640
+
+python3 two_room_database.py -C "rtsp://admin:edge1234@192.168.1.115:554/cam/realmonitor?channel=1&subtype=0" --detection_input_size 640
+python3 two_room_database.py -C ./QE_video_0116/Hand_washing_test_2.mp4  --detection_input_size 640
+
+To Do
+save the original video
+copy the files
+
